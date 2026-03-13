@@ -10,4 +10,4 @@ variable "clusterName" {
   default     = "gitops-eks"
 }
 
-/*Test 5*/
+/*Test 6*/
