@@ -27,7 +27,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket = "gitopspj1"
+    bucket = "gitopsprojectdra"
     key    = "terraform.tfstate"
     region = "us-east-1"
   }
