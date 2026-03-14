@@ -1,19 +1,33 @@
 name: Manual Destroy
-on: workflow_dispatch # This allows you to click a button in GitHub to run it
+on: workflow_dispatch 
 
 jobs:
-  terraform:
+  terraform-cleanup:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          # This matches your "required_version = ~> 1.6.3" constraint
+          terraform_version: "1.6.3" 
+          terraform_wrapper: false
+
       - name: Terraform Init & Destroy
-        # CHANGE THIS: Point to the folder where your .tf files live
-        working-directory: ./terraform
+        # Ensure this matches your actual folder name in the repo
+        working-directory: ./terraform 
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: "us-east-1" # Add your specific region if not in provider.tf
         run: |
+          echo "--- Initializing Backend ---"
           terraform init
+          
+          echo "--- Listing State (Debug) ---"
+          terraform state list
+          
+          echo "--- Running Destroy ---"
           terraform destroy -auto-approve -refresh=true
