@@ -57,6 +57,10 @@ jobs:
       - name: Terraform Plan Status
         if: steps.plan.outcome == 'failure'
         run: echo "Terraform plan failed. Please check the plan output for details." && exit 1
+
+      - name: Cleanup Orphaned KMS State
+        working-directory: ./terraform
+        run: terraform state rm module.eks.aws_kms_key.this || true
       
       - name: Terraform Apply
         id: apply
