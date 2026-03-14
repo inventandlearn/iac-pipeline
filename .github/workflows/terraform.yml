@@ -63,6 +63,11 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name =='push'
         run: terraform apply -auto-approve -input=false -parallelism=1 planfile
 
+      - name: Terraform Clean Up
+        id: cleanup
+        if: steps.apply.outcome == 'failure'
+        run: terraform destroy -auto-approve -input=false -parallelism=1
+
       - name: Configure AWS credntials
         uses: aws-actions/configure-aws-credentials@v1
         with:
