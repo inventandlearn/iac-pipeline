@@ -57,6 +57,12 @@ jobs:
       - name: Terraform Plan Status
         if: steps.plan.outcome == 'failure'
         run: echo "Terraform plan failed. Please check the plan output for details." && exit 1
+      
+      - name: Find KMS Key Address
+        working-directory: ./terraform
+        run: |
+          terraform init
+          terraform state list | grep kms
 
       - name: Cleanup Orphaned KMS State
         working-directory: ./terraform
