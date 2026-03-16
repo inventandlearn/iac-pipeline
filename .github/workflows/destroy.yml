@@ -1,5 +1,11 @@
 name: Manual Destroy
-on: workflow_dispatch 
+on: 
+  workflow_dispatch:
+    inputs:
+      cluster_name:
+        description: 'Name of the EKS cluster to clean up'
+        required: true
+        default: 'my-eks-cluster'
 
 jobs:
   terraform-cleanup:
@@ -8,26 +14,49 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: "us-east-1"
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          # This matches your "required_version = ~> 1.6.3" constraint
           terraform_version: "1.6.3" 
           terraform_wrapper: false
 
+      - name: Pre-Destroy Kubernetes Cleanup
+        continue-on-error: true # Don't stop if the cluster is already gone
+        run: |
+          echo "--- Updating Kubeconfig ---"
+          aws eks update-kubeconfig --name ${{ github.event.inputs.cluster_name }} --region us-east-1
+          
+          echo "--- Deleting K8s Services (LoadBalancers) ---"
+          # This prevents "VPC has dependencies" errors by removing AWS ELBs
+          kubectl delete svc --all --all-namespaces --timeout=300s
+          
+          echo "--- Deleting PVCs ---"
+          # This releases EBS volumes so they can be destroyed
+          kubectl delete pvc --all --all-namespaces --timeout=300s
+          
+          echo "--- Waiting for Cloud Resources to Detach ---"
+          sleep 60
+
       - name: Terraform Init & Destroy
-        # Ensure this matches your actual folder name in the repo
         working-directory: ./terraform 
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: "us-east-1" # Add your specific region if not in provider.tf
+          AWS_REGION: "us-east-1"
         run: |
           echo "--- Initializing Backend ---"
           terraform init
           
-          echo "--- Listing State (Debug) ---"
-          terraform state list
+          echo "--- Running Targeted Destroy (EKS First) ---"
+          # Destroying the cluster/node groups first often helps clear ENIs
+          terraform destroy -target=module.eks -auto-approve || true
           
-          echo "--- Running Destroy ---"
+          echo "--- Running Final Destroy ---"
           terraform destroy -auto-approve -refresh=true
